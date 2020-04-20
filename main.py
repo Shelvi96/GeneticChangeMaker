@@ -2,28 +2,30 @@
 # -*- coding: utf-8 -*-
 
 from random import randrange
+from random import choice
 from typing import List
-import numpy as np
-import math
 from random import shuffle
 from copy import deepcopy
+import numpy as np
+import math
 
 
 class Genome:
 
     def __init__(self, coins: List[int], change: int):
-        self.coins = coins
-        self.change = change
-        self.coinBits = self.setCoins()
-        self.genome = self.generateIndividual()
+        self.coins = coins                          # list of available coins
+        self.change = change                        # change to be found
+        self.coinBits = self.setCoins()             # number of bits to code a coin
+        self.genome = self.generateIndividual()     # list of bits coding genome
 
     def setCoins(self) -> List[int]:
         coinBits = [0]
         coinSum = 0
         for coin in self.coins:
             numOfCoins = math.floor(self.change / coin)
-            coinSum += math.floor(math.log(numOfCoins, 2)) + 1
-            coinBits.append(coinSum)  # number of bits to code a coin
+            if numOfCoins != 0:
+                coinSum += math.floor(math.log(numOfCoins, 2)) + 1
+            coinBits.append(coinSum)
         return coinBits
 
     def generateIndividual(self) -> List[int]:
@@ -43,7 +45,7 @@ class Genome:
             sumOfCoins += numOfCoins * coin
             coinsCount += numOfCoins
 
-        return abs(sumOfCoins - self.change) + coinsCount*0.01
+        return abs(sumOfCoins - self.change) + 1.25*coinsCount
 
     def crossOver(self, g: "Genome"):
         half = math.floor(len(self.genome) / 2)
@@ -56,7 +58,7 @@ class Genome:
             if np.random.uniform(0, 1) < mutationProbability:
                 self.genome[i] = (self.genome[i] + 1) % 2
 
-    def printCoinSet(self):
+    def getCoinSet(self):
         i = 0
         ret = []
         for coin in self.coins:
@@ -69,18 +71,6 @@ class Genome:
             ret.append([coin, numOfCoins])
         return ret
 
-    def printAll(self):
-        print("Genome: ----------")
-        print(self.coins)
-        print(self.genome)
-        print(self.fitnessFunction())
-        print(self.printCoinSet())
-        print("------------------")
-
-    def printResult(self):
-        print(self.printCoinSet());
-        print("Uzyto", int(self.fitnessFunction()*100 % 100), "monet.")
-
 
 class Simulation:
 
@@ -91,11 +81,8 @@ class Simulation:
         self.maxIterations = maxIterations
         self.population = self.generatePopulation(coins, change)
 
-    def generatePopulation(self, coins: List[int], change: int) -> List["Genome"]:
-        population = []
-        for i in range(0, self.populationSize):
-            population.append(Genome(coins, change))
-        return population
+    def generatePopulation(self, coins: List[int], change: int) -> List['Genome']:
+        return [Genome(coins, change) for _ in range(self.populationSize)]
 
     def reproduce(self) -> List[List[int]]:
         populationCopy = deepcopy(self.population)
@@ -104,7 +91,7 @@ class Simulation:
         # Cross Over
         for i in range(0, len(populationCopy), 2):
             offspring.append(populationCopy[i].crossOver(populationCopy[i + 1]))
-            offspring.append(populationCopy[i+1].crossOver(populationCopy[i]))
+            offspring.append(populationCopy[i + 1].crossOver(populationCopy[i]))
 
         # Mutate
         for generation in offspring:
@@ -117,29 +104,38 @@ class Simulation:
         shuffle(self.population)
 
     def evolve(self):
-        for i in range(0, self.maxIterations):
-            if i % (self.maxIterations/5) == 0:
-                self.mutationProbability += 0.05
+        for i in range(self.maxIterations):
             self.reproduce()
 
-    def printAll(self):
-        for genome in sorted(self.population, key=lambda item: item.fitnessFunction()):
-            genome.printAll()
-
-    def printBest(self):
+    def getBest(self):
         sortedPopulation = sorted(self.population, key=lambda item: item.fitnessFunction())
-        print("BEST:")
-        sortedPopulation[0].printResult()
+        return sortedPopulation[0].getCoinSet()
+
 
 def main():
-    coins = [1, 2, 5, 10, 20, 50]
-    change = 90
+    coins = [1, 2, 5, 10, 20, 50, 100, 200, 500]
+    change = 5839
     print("Coins set", coins)
     print("Change", change)
 
-    populacja1 = Simulation(coins, change, populationSize=20, mutationProbability=0.05, maxIterations=500)
-    populacja1.evolve()
-    populacja1.printBest()
+    totalCoins = 0
+    totalChange = 0
+    reps = 10
+    for _ in range(reps):
+        populacja = Simulation(coins, change, populationSize=20, mutationProbability=0.05, maxIterations=500)
+        populacja.evolve()
+        best = populacja.getBest()
+        numOfCoins = 0
+        foundChange = 0
+        for [a,b] in best:
+            numOfCoins += b
+            foundChange += a*b
+        totalCoins += numOfCoins
+        totalChange += foundChange
+
+    print("AVG change", totalChange/reps)
+    print("AVG coins", totalCoins/reps)
+
 
 
 if __name__ == '__main__':
